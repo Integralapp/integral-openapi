@@ -1,4 +1,4 @@
-# Integral OpenAPI Description
+# Integral OpenAPI Specification
 
 This repository contains the [OpenAPI description](/openapi.yml) for <https://docs.integralapi.co/introduction>.
 
