@@ -22,7 +22,7 @@ paths:
                 $ref: '#/components/schemas/ApiKey'
       summary: Generate an API key
       security: &ref_0
-        - AuthHeaderAuth: []
+        - ApiKeyAuth: []
       requestBody:
         required: true
         content:
@@ -301,7 +301,6 @@ paths:
                 - headers
                 - path
                 - queryParams
-                - metadata
 components:
   schemas:
     ApplicationUserCreateResponse:
@@ -492,25 +491,27 @@ components:
     UserParseResponse:
       type: object
       properties:
-        id:
+        integralId:
           type: string
+        metadata:
+          type: object
+          additionalProperties: {}
+        userForeignId:
+          type: string
+        isAllowlistedOnEndpoint:
+          type: boolean
         createdAt:
           type: string
-        firstName:
+        updatedAt:
           type: string
-        lastName:
-          type: string
-        email:
-          type: string
-        isAdmin:
+        deletedAt:
           type: boolean
       required:
-        - id
+        - integralId
+        - userForeignId
         - createdAt
-        - firstName
-        - lastName
-        - email
-        - isAdmin
+        - updatedAt
+        - deletedAt
     ApiKeyParseResponse:
       type: object
       properties:
@@ -522,12 +523,12 @@ components:
         - isAllowed
         - environment
   securitySchemes:
-    AuthHeaderAuth:
+    ApiKeyAuth:
       type: apiKey
       in: header
-      name: Authentication
+      name: Authorization
 servers:
   - url: https://api.integralapi.co/public
     description: Production
-  - url: http://localhost:3000/
+  - url: http://localhost:4000/public
     description: Local
