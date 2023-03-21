@@ -449,7 +449,7 @@ components:
         apiKey:
           type: string
         error:
-          type: string
+          type: boolean
         errorCode:
           type: string
         displayMessage:
@@ -461,8 +461,6 @@ components:
       required:
         - message
         - solution
-        - apiKey
-        - error
         - errorCode
         - displayMessage
     ApplicationParseResponse:
