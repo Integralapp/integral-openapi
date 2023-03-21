@@ -439,7 +439,6 @@ components:
         - statusCode
         - user
         - application
-        - returnBackToUser
     ReturnBackToUserResponse:
       type: object
       properties:
@@ -485,7 +484,6 @@ components:
         - id
         - createdAt
         - updatedAt
-        - deletedAt
         - name
         - description
     UserParseResponse:
@@ -505,13 +503,7 @@ components:
         updatedAt:
           type: string
         deletedAt:
-          type: boolean
-      required:
-        - integralId
-        - userForeignId
-        - createdAt
-        - updatedAt
-        - deletedAt
+          type: string
     ApiKeyParseResponse:
       type: object
       properties:
@@ -521,7 +513,6 @@ components:
           type: string
       required:
         - isAllowed
-        - environment
   securitySchemes:
     ApiKeyAuth:
       type: apiKey
