@@ -30,7 +30,7 @@ paths:
             schema:
               type: object
               properties:
-                applicationUserForeignId:
+                userId:
                   type: string
                   description: >
                     This is a unique index on your database to find users.  This
@@ -50,8 +50,8 @@ paths:
                     not be able to access real data and will only be able to
                     work with templated data.
               required:
-                - applicationUserForeignId
-  /key/{applicationUserForeignId}:
+                - userId
+  /key/{userId}:
     get:
       description: |
         Retrieve all API keys for the given Application User
@@ -59,7 +59,7 @@ paths:
       tags:
         - ApiKeys
       parameters:
-        - name: applicationUserForeignId
+        - name: userId
           in: path
           required: true
           schema:
@@ -177,23 +177,26 @@ paths:
             schema:
               type: object
               properties:
-                applicationUserForeignId:
+                userId:
                   type: string
                   description: >
                     This is a unique index on your database to find users.  This
                     will allow us to know which API key associates to each user
                     on your application's end.
-                applicationTierId:
+                tierId:
                   type: string
                   description: >
                     This is an ID provided by Integral to reference an
                     application tier you would like to assign for this user. You
                     can find the application tier IDs by sending a GET request
                     to the `/public/tiers` endpoint.
+                description:
+                  type: string
+                  description: Generic description to describe the given Application User
               required:
-                - applicationUserForeignId
-                - applicationTierId
-  /user/{applicationUserForeignId}:
+                - userId
+                - tierId
+  /user/{userId}:
     get:
       description: >-
         This endpoint takes in an Application User's ID and returns back
@@ -202,8 +205,12 @@ paths:
       tags:
         - ApplicationUser
       parameters:
-        - name: applicationUserForeignId
+        - name: userId
           in: path
+          description: >
+            This is a unique index on your database to find users.  This will
+            allow us to know which API key associates to each user on your
+            application's end.
           required: true
           schema:
             type: string
@@ -263,7 +270,7 @@ paths:
                     HTTP method of the incoming request Allowed values: `GET`,
                     `POST`, `PUT`, `DELETE`, `PATCH`, `OPTIONS`, `CONNECT`,
                     `TRACE`
-                body:
+                requestBody:
                   type: object
                   additionalProperties: {}
                   description: >
@@ -297,10 +304,33 @@ paths:
                 - apiKey
                 - ip
                 - method
-                - body
+                - requestBody
                 - headers
                 - path
                 - queryParams
+  /tiers:
+    get:
+      description: >
+        This request is used to fetch all the Tiers allowed to be assigned to a
+        user, before creating one. Call this endpoint before creating an
+        Application User
+      operationId: tiers_get-all
+      tags:
+        - Tiers
+      parameters: []
+      responses:
+        '200':
+          description: >-
+            The response of this API request provides back a list of information
+            on all Application Tiers created for the given Application ID.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ApplicationTier'
+      summary: Get All Application tiers
+      security: *ref_0
 components:
   schemas:
     ApplicationUserCreateResponse:
@@ -511,6 +541,54 @@ components:
           type: string
       required:
         - isAllowed
+    ApplicationTier:
+      type: object
+      properties:
+        id:
+          type: string
+        createdAt:
+          type: string
+        updatedAt:
+          type: string
+        deletedAt:
+          type: string
+        role:
+          type: string
+        description:
+          type: string
+        application:
+          $ref: '#/components/schemas/Application'
+        applicationRateLimit:
+          $ref: '#/components/schemas/ApplicationRateLimit'
+      required:
+        - id
+        - createdAt
+        - updatedAt
+        - role
+        - description
+        - application
+        - applicationRateLimit
+    ApplicationRateLimit:
+      type: object
+      properties:
+        id:
+          type: string
+        createdAt:
+          type: string
+        updatedAt:
+          type: string
+        deletedAt:
+          type: string
+        numOfRequests:
+          type: integer
+        timeInterval:
+          type: string
+      required:
+        - id
+        - createdAt
+        - updatedAt
+        - numOfRequests
+        - timeInterval
   securitySchemes:
     ApiKeyAuth:
       type: apiKey
