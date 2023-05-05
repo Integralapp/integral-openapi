@@ -224,13 +224,13 @@ paths:
                 $ref: '#/components/schemas/ApplicationUser'
       summary: Get an Application User
       security: *ref_0
-  /parse:
+  /parse/pre-process:
     post:
       description: >
-        The main processor of information for any endpoint: API keys (paused and
-        revoked), Versioning, Access Control, Field Validation, Billing, Dynamic
-        Rate Limiting, and more.
-      operationId: parse_parse
+        This endpoint should be put in the pre-processing middleware: 
+        Authentication, Access Control, Dynamic Rate Limiting, Idempotency,
+        Versioning, Sandbox, and more.
+      operationId: parse_pre-process
       tags:
         - Parse
       parameters: []
@@ -244,8 +244,8 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ParseApiRequestResponse'
-      summary: Parse Your Public API
+                $ref: '#/components/schemas/PreProcessApiResponse'
+      summary: Pre-Process Your Public API
       security: *ref_0
       requestBody:
         required: true
@@ -256,7 +256,7 @@ paths:
               properties:
                 apiKey:
                   type: string
-                  description: >-
+                  description: >
                     This API key is the key passed in by your API’s user. This
                     is crucial for us to parse out your application’s user
                 ip:
@@ -300,6 +300,17 @@ paths:
                     A single level key-value JSON object that can be used to
                     store custom data for the API request; keys and values must
                     be strings
+                idempotencyKey:
+                  type: string
+                  description: >
+                    This key is a **user generated** unique identifier to map to
+                    a request. This allows requests to be safely retry requests
+                    without the risk of duplicating operations.
+
+                    `GET`, `PUT`, and `DELETE` are generally safe to retry
+                    (according to standard REST practices). For `POST` and
+                    `PATCH` requests, is recommended to send and store the
+                    `idempotencyKey` in their system.
               required:
                 - apiKey
                 - ip
@@ -308,6 +319,90 @@ paths:
                 - headers
                 - path
                 - queryParams
+  /parse/post-process:
+    post:
+      description: >
+        This endpoint only works in conjunction to the Pre-processing endpoint
+        `POST /parse/pre-processing`.  Without it, the necessary information for
+        this endpoint won't be found.
+      operationId: parse_post-process
+      tags:
+        - Parse
+      parameters: []
+      responses:
+        '200':
+          description: >
+            The response of this API request can vary to return back either a
+            descriptive error message for you (not your user) to use for
+            debugging, or information on the API request and the Idempotency Key
+            provided (to indicate a successful operation).
+
+            If idempotencyInfo does not exist for a given endpoint (the endpoint
+            may not have it configured), then we will return back the request
+            and idempotency key information.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PostProcessApiResponse'
+      summary: Post-Process Your Public API
+      security: *ref_0
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                endpointId:
+                  type: string
+                  description: >-
+                    This endpoint ID is taken from the pre-processing endpoint
+                    and passed in here.
+                requestId:
+                  type: string
+                  description: >-
+                    This request ID is taken from the pre-processing endpoint
+                    and passed in here.
+                responseStatusCode:
+                  type: integer
+                  description: >
+                    This is the status code your API will respond with for the
+                    given request. Must have a `2xx` status code.
+                requestBody:
+                  type: object
+                  additionalProperties: {}
+                  description: >
+                    This request body comes from expected return from your
+                    services. If the same idempotency key is sent, then we'll
+                    automatically return back this response body.
+                apiKey:
+                  type: string
+                  description: >
+                    This API key is the key passed in by your API's user. This
+                    is crucial for us to parse out your application's user. You
+                    can also find this apiKey returned by our pre-process
+                    endpoint.
+                idempotencyKey:
+                  type: string
+                  description: >
+                    This key is a **user generated** unique identifier to map to
+                    a request. This allows requests to be safely retry requests
+                    without the risk of duplicating operations.
+
+                    `GET`, `PUT`, and `DELETE` are generally safe to retry
+                    (according to standard REST practices). For `POST` and
+                    `PATCH` requests, is recommended to send and store the
+                    `idempotencyKey` in their system.
+
+                    **It will be returned to you by our pre-process endpoint for
+                    consistency purposes.**
+              required:
+                - endpointId
+                - requestId
+                - responseStatusCode
+                - requestBody
+                - apiKey
+                - idempotencyKey
   /tiers:
     get:
       description: >
@@ -451,11 +546,11 @@ components:
         - numOfRequest
         - firstTimeRequest
         - applicationUser
-    ParseApiRequestResponse:
+    PreProcessApiResponse:
       type: object
       properties:
-        apiKey:
-          $ref: '#/components/schemas/ApiKeyParseResponse'
+        request:
+          $ref: '#/components/schemas/RequestPreProcessResponse'
         statusCode:
           type: integer
         user:
@@ -465,10 +560,103 @@ components:
         returnBackToUser:
           $ref: '#/components/schemas/ReturnBackToUserResponse'
       required:
-        - apiKey
+        - request
         - statusCode
         - user
         - application
+    PostProcessApiResponse:
+      type: object
+      properties:
+        request:
+          $ref: '#/components/schemas/RequestType'
+        idempotencyKey:
+          $ref: '#/components/schemas/IdempotencyKeyType'
+      required:
+        - request
+        - idempotencyKey
+    RequestType:
+      type: object
+      properties:
+        id:
+          type: string
+        createdAt:
+          type: string
+        updatedAt:
+          type: string
+        deletedAt:
+          type: string
+        userApiKey:
+          type: object
+          additionalProperties: {}
+        route:
+          type: string
+        method:
+          type: string
+        headers:
+          type: object
+          additionalProperties: {}
+        traceback:
+          type: object
+          additionalProperties: {}
+        ip:
+          type: string
+        isSandbox:
+          type: boolean
+        metadata:
+          type: object
+          additionalProperties: {}
+        responseStatusCode:
+          type: integer
+        responseBody:
+          type: object
+          additionalProperties: {}
+      required:
+        - id
+        - createdAt
+        - updatedAt
+        - userApiKey
+        - route
+        - method
+        - headers
+        - ip
+        - isSandbox
+        - responseStatusCode
+        - responseBody
+    IdempotencyKeyType:
+      type: object
+      properties:
+        id:
+          type: string
+        createdAt:
+          type: string
+        updatedAt:
+          type: string
+        deletedAt:
+          type: string
+        key:
+          type: string
+        endpoint:
+          type: object
+          additionalProperties: {}
+        expiresAt:
+          type: string
+        apiKey:
+          type: object
+          additionalProperties: {}
+        responseStatusCode:
+          type: integer
+        responseBody:
+          type: object
+          additionalProperties: {}
+      required:
+        - id
+        - createdAt
+        - updatedAt
+        - key
+        - endpoint
+        - expiresAt
+        - apiKey
+        - responseBody
     ReturnBackToUserResponse:
       type: object
       properties:
@@ -522,7 +710,7 @@ components:
         metadata:
           type: object
           additionalProperties: {}
-        userForeignId:
+        userId:
           type: string
         isAllowlistedOnEndpoint:
           type: boolean
@@ -532,15 +720,35 @@ components:
           type: string
         deletedAt:
           type: string
-    ApiKeyParseResponse:
+        idempotencyKey:
+          type: string
+      required:
+        - integralId
+        - userId
+        - isAllowlistedOnEndpoint
+    RequestPreProcessResponse:
       type: object
       properties:
-        isAllowed:
+        hasResponseContent:
           type: boolean
         environment:
           type: string
+        id:
+          type: string
+        endpoint:
+          $ref: '#/components/schemas/EndpointPreProcessType'
       required:
-        - isAllowed
+        - hasResponseContent
+        - environment
+        - id
+        - endpoint
+    EndpointPreProcessType:
+      type: object
+      properties:
+        id:
+          type: string
+      required:
+        - id
     ApplicationTier:
       type: object
       properties:
