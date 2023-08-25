@@ -36,14 +36,22 @@ paths:
                     This is a unique index on your database to find users.  This
                     will allow us to know which API key associates to each user
                     on your application's end.
+                name:
+                  type: string
+                  nullable: true
+                  description: >
+                    This is the name of the key that will be indexed and shown
+                    as a helpful human identifier for the key and it's relevant
+                    information (logs, events, and errors).
                 description:
                   type: string
+                  nullable: true
                   description: >
-                    This is the description applied to an API key to identify it
-                    for a human. Use this to describe who the key belongs to, or
-                    why this key is relevant/exists.
+                    Extra space for any additional metadata or information
+                    needed to be applied on a key.
                 isSandbox:
                   type: boolean
+                  nullable: true
                   description: >
                     This value is a boolean to determine whether the key is for
                     Sandbox use only or not. If it is for sandbox use, it will
@@ -51,11 +59,12 @@ paths:
                     work with templated data.
               required:
                 - userId
-  /key/{userId}:
+  /key/{userId}/production:
     get:
-      description: |
-        Retrieve all API keys for the given Application User
-      operationId: apiKeys_retrieve
+      description: >
+        Retrieve a paginated list of production API keys for a given Application
+        User
+      operationId: apiKeys_retrieve-production
       tags:
         - ApiKeys
       parameters:
@@ -64,11 +73,27 @@ paths:
           required: true
           schema:
             type: string
+        - name: limit
+          in: query
+          description: A range of number of keys wanted, min 1 and max 100. Default is 10.
+          required: false
+          schema:
+            type: integer
+            nullable: true
+        - name: after
+          in: query
+          description: >-
+            The ID of the previous page's last key (to retrieve the next set of
+            rows)
+          required: false
+          schema:
+            type: string
+            nullable: true
       responses:
         '200':
           description: >
             The response of this API request provides back a list of information
-            on all generated API keys for a given Application User.
+            on all generated production API keys for a given Application User.
 
             ** This list does contain revoked and paused API keys **
           content:
@@ -77,13 +102,59 @@ paths:
                 type: array
                 items:
                   $ref: '#/components/schemas/ApiKey'
-      summary: Get Application User's API keys
+      summary: Get Application User's Production API keys
+      security: *ref_0
+  /key/{userId}:
+    get:
+      description: >
+        Retrieve a paginated list of sandbox API keys for a given Application
+        User
+      operationId: apiKeys_retrieve-sandbox
+      tags:
+        - ApiKeys
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: limit
+          in: query
+          description: A range of number of keys wanted, min 1 and max 100. Default is 10.
+          required: false
+          schema:
+            type: integer
+            nullable: true
+        - name: after
+          in: query
+          description: >-
+            The ID of the previous page's last key (to retrieve the next set of
+            rows)
+          required: false
+          schema:
+            type: string
+            nullable: true
+      responses:
+        '200':
+          description: >
+            The response of this API request provides back a list of information
+            on all generated sandbox API keys for a given Application User.
+
+            ** This list does contain revoked and paused API keys **
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ApiKey'
+      summary: Get Application User's Sandbox API keys
       security: *ref_0
   /key/pause:
     put:
       description: >
         Given an API Key generated for your application's user, this endpoint
-        allows you to pause the API key.
+        allows you to pause the API key (temporarily stopping any API requests
+        from being processed on it).
       operationId: apiKeys_pause
       tags:
         - ApiKeys
@@ -92,7 +163,7 @@ paths:
         '200':
           description: >-
             The response of this API request gives back information on
-            Application User's API Key that was paused
+            Application User's API Key that temporarily can't make API requests
           content:
             application/json:
               schema:
@@ -113,15 +184,51 @@ paths:
                     Application User.
               required:
                 - apiKey
+  /key/unpause:
+    put:
+      description: >
+        Given an API Key generated for your application's user, this endpoint
+        allows you to unpause the given API key.
+      operationId: apiKeys_unpause
+      tags:
+        - ApiKeys
+      parameters: []
+      responses:
+        '200':
+          description: >-
+            The response of this API request gives back information on
+            Application User's API Key that can now successfully make API
+            requests
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiKey'
+      summary: Unpause an API key
+      security: *ref_0
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                apiKey:
+                  type: string
+                  description: >-
+                    This API key is generated by Integral and passed to the
+                    Application User.
+              required:
+                - apiKey
   /key/revoke:
     delete:
       description: >
         This endpoint is used to revoke a key. 
 
-        Revoking an API key means making all of it's content and previous data
-        still persistent, but no longer usable. 
+        Revoking an API key makes all of the key's data read only (logs, events,
+        and errors), but no longer able to continue making requests.
 
-        Once a key is revoked, it can never be set back to normal.
+        Once a key is revoked, it can never be used to make an API request
+        again.
       operationId: apiKeys_revoke
       tags:
         - ApiKeys
@@ -151,6 +258,49 @@ paths:
                     Application User.
               required:
                 - apiKey
+  /key/rotate:
+    put:
+      description: >
+        This endpoint allows you to set a time for the given key to be revoked
+        (at given time intervals).  It also creates a new key that holds all the
+        previous key's logs and information, to allow you to continue making
+        requests with it.
+      operationId: apiKeys_rotate
+      tags:
+        - ApiKeys
+      parameters: []
+      responses:
+        '200':
+          description: >-
+            The response of this API request gives back information on an
+            Application User's API Key that was revoked
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiKey'
+      summary: Rotate an API Key
+      security: *ref_0
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                apiKey:
+                  type: string
+                  description: >-
+                    This API key is generated by Integral and passed to the
+                    Application User.
+                expiresIn:
+                  $ref: '#/components/schemas/RotateTimings'
+                  description: >-
+                    A human readable determined enum value of either `now`,
+                    `1h`, `24h`, `3d`, or `7d` of when we should revoke the
+                    given key
+              required:
+                - apiKey
+                - expiresIn
   /user:
     post:
       description: >
@@ -192,7 +342,15 @@ paths:
                     to the `/public/tiers` endpoint.
                 description:
                   type: string
+                  nullable: true
                   description: Generic description to describe the given Application User
+                metadata:
+                  type: object
+                  additionalProperties: true
+                  nullable: true
+                  description: >-
+                    Any relevant metadata helpful in searching or indexing
+                    information on a user.
               required:
                 - userId
                 - tierId
@@ -200,7 +358,8 @@ paths:
     get:
       description: >-
         This endpoint takes in an Application User's ID and returns back
-        relevant information about the user
+        relevant information about the user, including the given application and
+        tier.
       operationId: applicationUser_get
       tags:
         - ApplicationUser
@@ -223,6 +382,45 @@ paths:
               schema:
                 $ref: '#/components/schemas/ApplicationUser'
       summary: Get an Application User
+      security: *ref_0
+  /logs:
+    get:
+      description: >
+        Returns back paginated list of logs for a given application, with
+        minimum of 1 log and maximum of 100 logs per request
+      operationId: logs_get-logs-by-application
+      tags:
+        - Logs
+      parameters:
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            nullable: true
+        - name: starting_after
+          in: query
+          required: false
+          schema:
+            type: string
+            nullable: true
+        - name: user_id
+          in: query
+          description: >-
+            The user ID of the user you want the logs for on a given
+            application, from your user table
+          required: false
+          schema:
+            type: string
+            nullable: true
+      responses:
+        '200':
+          description: Paginated logs to understand recent application data
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GetLogsByApplicationResponse'
+      summary: Get Logs by Application
       security: *ref_0
   /parse/pre-process:
     post:
@@ -272,13 +470,13 @@ paths:
                     `TRACE`
                 requestBody:
                   type: object
-                  additionalProperties: {}
+                  additionalProperties: true
                   description: >
                     The request body from the incoming request from input
                     validation. Null if request method is a GET
                 headers:
                   type: object
-                  additionalProperties: {}
+                  additionalProperties: true
                   description: |
                     Headers from the incoming request
                 path:
@@ -288,20 +486,22 @@ paths:
                     endpoints created on the Integral platform.
                 queryParams:
                   type: object
-                  additionalProperties: {}
+                  additionalProperties: true
                   description: >
                     The query parameters (parameters in the URL that come after
                     the base URL and ?) of a request object. Pass in an empty
                     object if it doesn’t exist.
                 metadata:
                   type: object
-                  additionalProperties: {}
+                  additionalProperties: true
+                  nullable: true
                   description: >
                     A single level key-value JSON object that can be used to
                     store custom data for the API request; keys and values must
                     be strings
                 idempotencyKey:
                   type: string
+                  nullable: true
                   description: >
                     This key is a **user generated** unique identifier to map to
                     a request. This allows requests to be safely retry requests
@@ -311,6 +511,16 @@ paths:
                     (according to standard REST practices). For `POST` and
                     `PATCH` requests, is recommended to send and store the
                     `idempotencyKey` in their system.
+                version:
+                  type: string
+                  nullable: true
+                  description: >
+                    A value passed in for the version string of a given
+                    request. 
+
+                    This is not to be confused with the `version` field returned
+                    on the `request` object in the response. This version is the
+                    raw string passed in from the user.
               required:
                 - apiKey
                 - ip
@@ -370,7 +580,7 @@ paths:
                     given request. Must have a `2xx` status code.
                 requestBody:
                   type: object
-                  additionalProperties: {}
+                  additionalProperties: true
                   description: >
                     This request body comes from expected return from your
                     services. If the same idempotency key is sent, then we'll
@@ -428,17 +638,31 @@ paths:
       security: *ref_0
 components:
   schemas:
+    RotateTimings:
+      title: RotateTimings
+      type: string
+      enum:
+        - now
+        - 1h
+        - 24h
+        - 3d
+        - 7d
     ApplicationUserCreateResponse:
+      title: ApplicationUserCreateResponse
       type: object
       properties:
         applicationUser:
           $ref: '#/components/schemas/ApplicationUser'
-        apiKey:
-          $ref: '#/components/schemas/ApiKey'
+        productionApiKey:
+          type: string
+        sandboxApiKey:
+          type: string
       required:
         - applicationUser
-        - apiKey
+        - productionApiKey
+        - sandboxApiKey
     ApplicationUser:
+      title: ApplicationUser
       type: object
       properties:
         id:
@@ -449,11 +673,13 @@ components:
           type: string
         deletedAt:
           type: string
+          nullable: true
         applicationUserForeignId:
           type: string
         metadata:
           type: object
-          additionalProperties: {}
+          additionalProperties: true
+          nullable: true
         applicationRole:
           $ref: '#/components/schemas/ApplicationRole'
         application:
@@ -466,6 +692,7 @@ components:
         - applicationRole
         - application
     ApplicationRole:
+      title: ApplicationRole
       type: object
       properties:
         id:
@@ -476,16 +703,19 @@ components:
           type: string
         deletedAt:
           type: string
+          nullable: true
         role:
           type: string
         description:
           type: string
+          nullable: true
       required:
         - id
         - createdAt
         - updatedAt
         - role
     Application:
+      title: Application
       type: object
       properties:
         id:
@@ -496,11 +726,23 @@ components:
           type: string
         deletedAt:
           type: string
+          nullable: true
         name:
           type: string
         description:
           type: string
         publicId:
+          type: string
+        organization:
+          $ref: '#/components/schemas/Organization'
+        baseUrl:
+          $ref: '#/components/schemas/ApplicationBaseUrl'
+        ipRateLimit:
+          type: integer
+        amountPerInterval:
+          type: string
+          nullable: true
+        timeInterval:
           type: string
       required:
         - id
@@ -509,7 +751,52 @@ components:
         - name
         - description
         - publicId
+        - organization
+        - baseUrl
+        - ipRateLimit
+        - timeInterval
+    Organization:
+      title: Organization
+      type: object
+      properties:
+        id:
+          type: string
+        createdAt:
+          type: string
+        updatedAt:
+          type: string
+        deletedAt:
+          type: string
+          nullable: true
+        name:
+          type: string
+      required:
+        - id
+        - createdAt
+        - updatedAt
+        - name
+    ApplicationBaseUrl:
+      title: ApplicationBaseUrl
+      type: object
+      properties:
+        id:
+          type: string
+        createdAt:
+          type: string
+        updatedAt:
+          type: string
+        deletedAt:
+          type: string
+          nullable: true
+        url:
+          type: string
+      required:
+        - id
+        - createdAt
+        - updatedAt
+        - url
     ApiKey:
+      title: ApiKey
       type: object
       properties:
         id:
@@ -522,31 +809,175 @@ components:
           type: string
         apiKey:
           type: string
+        name:
+          type: string
+          nullable: true
+        expiresAt:
+          type: string
+        description:
+          type: string
+          nullable: true
         isPaused:
           type: boolean
         isRevoked:
           type: boolean
-        isRotatedOff:
-          type: boolean
-        numOfRequest:
-          type: integer
-        firstTimeRequest:
+        lastUsed:
           type: string
-        applicationUser:
-          $ref: '#/components/schemas/ApplicationUser'
+          nullable: true
       required:
         - id
         - createdAt
         - updatedAt
         - deletedAt
         - apiKey
+        - expiresAt
         - isPaused
         - isRevoked
-        - isRotatedOff
-        - numOfRequest
-        - firstTimeRequest
-        - applicationUser
+    ApplicationVersion:
+      title: ApplicationVersion
+      type: object
+      properties:
+        id:
+          type: string
+        createdAt:
+          type: string
+        updatedAt:
+          type: string
+        deletedAt:
+          type: string
+          nullable: true
+        version:
+          type: string
+      required:
+        - id
+        - createdAt
+        - updatedAt
+        - version
+    ApplicationBaseUrlEndpoint:
+      title: ApplicationBaseUrlEndpoint
+      type: object
+      properties:
+        id:
+          type: string
+        createdAt:
+          type: string
+        updatedAt:
+          type: string
+        deletedAt:
+          type: string
+          nullable: true
+        path:
+          type: string
+        name:
+          type: string
+        scopeKey:
+          type: string
+        description:
+          type: string
+        method:
+          type: string
+        queryParams:
+          type: object
+          additionalProperties: true
+          nullable: true
+        requestBody:
+          type: object
+          additionalProperties: true
+          nullable: true
+        requestHeaders:
+          type: object
+          additionalProperties: true
+          nullable: true
+        sandboxFieldLocation:
+          type: string
+          nullable: true
+        sandboxFieldName:
+          type: string
+          nullable: true
+      required:
+        - id
+        - createdAt
+        - updatedAt
+        - path
+        - name
+        - scopeKey
+        - description
+        - method
+    Log:
+      title: Log
+      type: object
+      properties:
+        id:
+          type: string
+        createdAt:
+          type: string
+        updatedAt:
+          type: string
+        user:
+          $ref: '#/components/schemas/ApplicationUser'
+        application:
+          $ref: '#/components/schemas/Application'
+        userApiKey:
+          $ref: '#/components/schemas/ApiKey'
+          nullable: true
+        route:
+          type: string
+        method:
+          type: string
+        body:
+          type: object
+          additionalProperties: true
+          nullable: true
+        headers:
+          type: object
+          additionalProperties: true
+          nullable: true
+        ip:
+          type: string
+        isSandbox:
+          type: boolean
+        metadata:
+          type: object
+          additionalProperties: true
+          nullable: true
+        version:
+          type: string
+          nullable: true
+        endpoint:
+          $ref: '#/components/schemas/ApplicationBaseUrlEndpoint'
+          nullable: true
+        responseStatusCode:
+          type: integer
+          nullable: true
+        responseBody:
+          type: object
+          additionalProperties: true
+          nullable: true
+      required:
+        - id
+        - createdAt
+        - updatedAt
+        - user
+        - application
+        - route
+        - method
+        - ip
+        - isSandbox
+    GetLogsByApplicationResponse:
+      title: GetLogsByApplicationResponse
+      type: object
+      properties:
+        logs:
+          type: array
+          items:
+            $ref: '#/components/schemas/Log'
+        hasNextPage:
+          type: boolean
+      required:
+        - logs
+        - hasNextPage
     PreProcessApiResponse:
+      title: PreProcessApiResponse
       type: object
       properties:
         request:
@@ -558,13 +989,15 @@ components:
         application:
           $ref: '#/components/schemas/ApplicationParseResponse'
         returnBackToUser:
-          $ref: '#/components/schemas/ReturnBackToUserResponse'
+          $ref: '#/components/schemas/ReturnBackToUserUnionType'
+          nullable: true
       required:
         - request
         - statusCode
         - user
         - application
     PostProcessApiResponse:
+      title: PostProcessApiResponse
       type: object
       properties:
         request:
@@ -575,6 +1008,7 @@ components:
         - request
         - idempotencyKey
     RequestType:
+      title: RequestType
       type: object
       properties:
         id:
@@ -585,31 +1019,34 @@ components:
           type: string
         deletedAt:
           type: string
+          nullable: true
         userApiKey:
           type: object
-          additionalProperties: {}
+          additionalProperties: true
         route:
           type: string
         method:
           type: string
         headers:
           type: object
-          additionalProperties: {}
+          additionalProperties: true
         traceback:
           type: object
-          additionalProperties: {}
+          additionalProperties: true
+          nullable: true
         ip:
           type: string
         isSandbox:
           type: boolean
         metadata:
           type: object
-          additionalProperties: {}
+          additionalProperties: true
+          nullable: true
         responseStatusCode:
           type: integer
         responseBody:
           type: object
-          additionalProperties: {}
+          additionalProperties: true
       required:
         - id
         - createdAt
@@ -623,6 +1060,7 @@ components:
         - responseStatusCode
         - responseBody
     IdempotencyKeyType:
+      title: IdempotencyKeyType
       type: object
       properties:
         id:
@@ -633,21 +1071,23 @@ components:
           type: string
         deletedAt:
           type: string
+          nullable: true
         key:
           type: string
         endpoint:
           type: object
-          additionalProperties: {}
+          additionalProperties: true
         expiresAt:
           type: string
         apiKey:
           type: object
-          additionalProperties: {}
+          additionalProperties: true
         responseStatusCode:
           type: integer
+          nullable: true
         responseBody:
           type: object
-          additionalProperties: {}
+          additionalProperties: true
       required:
         - id
         - createdAt
@@ -657,7 +1097,14 @@ components:
         - expiresAt
         - apiKey
         - responseBody
-    ReturnBackToUserResponse:
+    ReturnBackToUserUnionType:
+      title: ReturnBackToUserUnionType
+      oneOf:
+        - $ref: '#/components/schemas/ReturnBackToUserErrorResponse'
+        - type: object
+          additionalProperties: true
+    ReturnBackToUserErrorResponse:
+      title: ReturnBackToUserErrorResponse
       type: object
       properties:
         message:
@@ -666,22 +1113,27 @@ components:
           type: string
         apiKey:
           type: string
+          nullable: true
         error:
           type: boolean
+          nullable: true
         errorCode:
           type: string
         displayMessage:
           type: string
         documentationUrl:
           type: string
+          nullable: true
         causes:
           type: string
+          nullable: true
       required:
         - message
         - solution
         - errorCode
         - displayMessage
     ApplicationParseResponse:
+      title: ApplicationParseResponse
       type: object
       properties:
         id:
@@ -692,6 +1144,7 @@ components:
           type: string
         deletedAt:
           type: string
+          nullable: true
         name:
           type: string
         description:
@@ -703,30 +1156,37 @@ components:
         - name
         - description
     UserParseResponse:
+      title: UserParseResponse
       type: object
       properties:
         integralId:
           type: string
         metadata:
           type: object
-          additionalProperties: {}
+          additionalProperties: true
+          nullable: true
         userId:
           type: string
         isAllowlistedOnEndpoint:
           type: boolean
         createdAt:
           type: string
+          nullable: true
         updatedAt:
           type: string
+          nullable: true
         deletedAt:
           type: string
+          nullable: true
         idempotencyKey:
           type: string
+          nullable: true
       required:
         - integralId
         - userId
         - isAllowlistedOnEndpoint
     RequestPreProcessResponse:
+      title: RequestPreProcessResponse
       type: object
       properties:
         hasResponseContent:
@@ -735,6 +1195,9 @@ components:
           type: string
         id:
           type: string
+        version:
+          type: string
+          nullable: true
         endpoint:
           $ref: '#/components/schemas/EndpointPreProcessType'
       required:
@@ -743,6 +1206,7 @@ components:
         - id
         - endpoint
     EndpointPreProcessType:
+      title: EndpointPreProcessType
       type: object
       properties:
         id:
@@ -750,6 +1214,7 @@ components:
       required:
         - id
     ApplicationTier:
+      title: ApplicationTier
       type: object
       properties:
         id:
@@ -760,6 +1225,7 @@ components:
           type: string
         deletedAt:
           type: string
+          nullable: true
         role:
           type: string
         description:
@@ -777,6 +1243,7 @@ components:
         - application
         - applicationRateLimit
     ApplicationRateLimit:
+      title: ApplicationRateLimit
       type: object
       properties:
         id:
@@ -787,16 +1254,17 @@ components:
           type: string
         deletedAt:
           type: string
+          nullable: true
         numOfRequests:
           type: integer
+          nullable: true
         timeInterval:
           type: string
+          nullable: true
       required:
         - id
         - createdAt
         - updatedAt
-        - numOfRequests
-        - timeInterval
   securitySchemes:
     ApiKeyAuth:
       type: apiKey
